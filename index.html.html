@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tham Gia Trả Lời Nhanh - Tin Học</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800;900&family=Bungee&display=swap" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; user-select: none; }
+        .bungee-font { font-family: 'Bungee', cursive; }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col justify-center items-center p-4">
+
+    <!-- 1. MÀN HÌNH NHẬP MÃ PHÒNG & TÊN -->
+    <div id="loginCard" class="w-full max-w-md bg-slate-900 border-2 border-amber-500/50 rounded-3xl p-6 md:p-8 shadow-2xl">
+        <div class="text-center mb-6">
+            <div class="w-14 h-14 bg-amber-500 text-slate-950 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-3 shadow-lg">
+                <i class="fa-solid fa-gamepad"></i>
+            </div>
+            <h2 class="text-lg font-black text-amber-300 bungee-font tracking-wide">ĐẤU TRƯỜNG TIN HỌC</h2>
+            <p class="text-xs text-slate-400 mt-1">Chủ đề: Thao tác tệp & thư mục (10s/câu)</p>
+        </div>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">MÃ PHÒNG (Do giáo viên cung cấp):</label>
+                <input type="text" id="inputRoom" value="8888" class="w-full bg-slate-950 border-2 border-slate-700 rounded-xl px-4 py-3 text-center text-amber-400 font-black tracking-widest text-lg focus:border-amber-400 outline-none uppercase font-mono">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">HỌ VÀ TÊN HỌC SINH:</label>
+                <input type="text" id="inputName" placeholder="Ví dụ: Nguyễn Văn An - Lớp 7A" class="w-full bg-slate-950 border-2 border-slate-700 rounded-xl px-4 py-3 text-xs md:text-sm font-bold text-white focus:border-amber-400 outline-none">
+            </div>
+
+            <button onclick="startGame()" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm rounded-xl shadow-lg transition-transform hover:scale-105 bungee-font">
+                BẮT ĐẦU THI ĐẤU <i class="fa-solid fa-play ml-1"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. MÀN HÌNH LÀM BÀI 10 GIÂY -->
+    <div id="quizCard" class="w-full max-w-2xl bg-slate-900 border-2 border-slate-700 rounded-3xl p-6 shadow-2xl hidden">
+        <!-- Thanh thông số trên cùng -->
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center gap-2">
+                <span id="qBadge" class="px-3 py-1 bg-amber-500 text-slate-950 font-black text-xs rounded-xl bungee-font">CÂU 1/8</span>
+                <span id="playerNameDisplay" class="text-xs font-bold text-slate-400">...</span>
+            </div>
+
+            <!-- Đồng hồ 10 giây -->
+            <div class="flex items-center gap-2 bg-slate-950 px-3.5 py-1.5 rounded-xl border border-red-500/40">
+                <i class="fa-solid fa-stopwatch text-red-400 text-sm animate-spin"></i>
+                <span id="timerSec" class="font-black text-red-400 text-sm font-mono">10</span>
+                <span class="text-[10px] text-slate-500">giây</span>
+            </div>
+        </div>
+
+        <!-- Thanh progress bar thời gian tụt dần -->
+        <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden mb-5 border border-slate-800">
+            <div id="timeBar" class="h-full bg-red-500 rounded-full transition-all duration-1000 ease-linear" style="width: 100%;"></div>
+        </div>
+
+        <!-- Tiêu đề câu hỏi -->
+        <h3 id="questionText" class="text-sm md:text-base font-black text-slate-100 mb-5 leading-snug">
+            Nội dung câu hỏi...
+        </h3>
+
+        <!-- 4 Lựa chọn -->
+        <div id="optionsGrid" class="grid grid-cols-1 gap-2.5 mb-4"></div>
+
+        <!-- Phản hồi đúng sai -->
+        <div id="feedbackBox" class="hidden p-3 rounded-2xl text-xs font-bold border mb-2"></div>
+    </div>
+
+    <!-- 3. MÀN HÌNH HOÀN THÀNH -->
+    <div id="resultCard" class="w-full max-w-md bg-slate-900 border-2 border-emerald-500 rounded-3xl p-8 text-center shadow-2xl hidden">
+        <div class="w-16 h-16 bg-emerald-500/20 text-emerald-400 border border-emerald-400/40 rounded-full flex items-center justify-center mx-auto text-3xl mb-3">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <h3 class="text-lg font-black text-emerald-400 bungee-font">ĐÃ NỘP BÀI THÀNH CÔNG!</h3>
+        <p class="text-xs text-slate-400 mt-1 mb-6">Kết quả của em đã được gửi trực tiếp lên bảng xếp hạng của giáo viên.</p>
+
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2 mb-6">
+            <div class="flex justify-between text-xs">
+                <span class="text-slate-400">Số câu trả lời đúng:</span>
+                <span id="finalCorrect" class="font-bold text-emerald-400 font-mono">0/8</span>
+            </div>
+            <div class="flex justify-between text-xs">
+                <span class="text-slate-400">Tổng thời gian:</span>
+                <span id="finalTime" class="font-bold text-slate-300 font-mono">0s</span>
+            </div>
+            <div class="flex justify-between text-xs pt-2 border-t border-slate-800">
+                <span class="text-amber-400 font-bold">Tổng điểm:</span>
+                <span id="finalScore" class="font-black text-amber-400 text-base font-mono">0</span>
+            </div>
+        </div>
+
+        <button onclick="location.reload()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-xs rounded-xl transition-all">
+            LÀM LẠI LƯỢT MỚI
+        </button>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            databaseURL: "https://tinhoc-luyentap-default-rtdb.firebaseio.com"
+        };
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const database = firebase.database();
+
+        // 8 CÂU HỎI THEO YÊU CẦU
+        const questionList = [
+            {
+                q: "Câu 1. Để tạo một thư mục mới trên máy tính, em thực hiện thao tác nào sau đây?",
+                options: [
+                    "Nháy chuột phải -> Chọn New -> Chọn Shortcut",
+                    "Nháy đúp chuột trái -> Chọn New -> Chọn Folder",
+                    "Nháy chuột phải tại vùng trống -> Chọn New -> Chọn Folder",
+                    "Nháy chuột phải -> Chọn Rename"
+                ],
+                correct: 2
+            },
+            {
+                q: "Câu 2. Phím tắt nào sau đây được sử dụng để sao chép (Copy) một tệp hoặc thư mục?",
+                options: [
+                    "Ctrl + X",
+                    "Ctrl + V",
+                    "Ctrl + Z",
+                    "Ctrl + C"
+                ],
+                correct: 3
+            },
+            {
+                q: "Câu 3. Thao tác 'Di chuyển' (Cut/Move) một tệp tin khác với thao tác 'Sao chép' (Copy) ở điểm nào?",
+                options: [
+                    "Di chuyển sẽ xóa tệp ở vị trí cũ và đưa đến vị trí mới, còn sao chép giữ nguyên tệp ở vị trí cũ và tạo thêm một bản sao ở vị trí mới",
+                    "Di chuyển và sao chép đều giữ lại bản gốc",
+                    "Sao chép sẽ xóa tệp ở vị trí cũ",
+                    "Không có gì khác biệt giữa hai thao tác này"
+                ],
+                correct: 0
+            },
+            {
+                q: "Câu 4. Để đổi tên cho một tệp hoặc thư mục, em chọn tệp/thư mục đó, nháy chuột phải rồi chọn lệnh nào?",
+                options: [
+                    "Delete",
+                    "Copy",
+                    "Rename",
+                    "Paste"
+                ],
+                correct: 2
+            },
+            {
+                q: "Câu 5. Khi em chọn một tệp và nhấn tổ hợp phím Shift + Delete trên bàn phím, điều gì sẽ xảy ra?",
+                options: [
+                    "Tệp được đưa vào thùng rác (Recycle Bin) và có thể khôi phục lại",
+                    "Tệp bị xóa vĩnh viễn khỏi máy tính, không đưa vào thùng rác",
+                    "Tệp được đổi tên mặc định",
+                    "Tệp được di chuyển sang một ổ đĩa khác"
+                ],
+                correct: 1
+            },
+            {
+                q: "Câu 6. Phím tắt nào được sử dụng để Dán (Paste) tệp hoặc thư mục sau khi đã thực hiện lệnh Copy hoặc Cut?",
+                options: [
+                    "Ctrl + P",
+                    "Ctrl + X",
+                    "Ctrl + V",
+                    "Ctrl + C"
+                ],
+                correct: 2
+            },
+            {
+                q: "Câu 7. Trong hệ điều hành Windows, khi đổi tên, tên tệp hoặc thư mục KHÔNG được chứa các ký tự nào sau đây?",
+                options: [
+                    "Dấu cách (khoảng trắng)",
+                    "Các chữ số từ 0 đến 9",
+                    "Dấu chấm (.)",
+                    "Các ký tự đặc biệt: \\ / : * ? \" < > |"
+                ],
+                correct: 3
+            },
+            {
+                q: "Câu 8. Nếu muốn chọn (bôi đen) tất cả các tệp và thư mục đang có trong một cửa sổ, em dùng tổ hợp phím nào?",
+                options: [
+                    "Ctrl + A",
+                    "Ctrl + S",
+                    "Shift + A",
+                    "Alt + A"
+                ],
+                correct: 0
+            }
+        ];
+
+        let roomCode = "";
+        let playerName = "";
+        let currentIdx = 0;
+        let score = 0;
+        let correctCount = 0;
+        let timer = null;
+        let timeLeft = 10;
+        let totalTimeSpent = 0;
+
+        function startGame() {
+            roomCode = document.getElementById('inputRoom').value.trim();
+            playerName = document.getElementById('inputName').value.trim();
+
+            if (!roomCode || !playerName) {
+                alert("Vui lòng nhập đầy đủ Mã phòng và Họ tên học sinh!");
+                return;
+            }
+
+            document.getElementById('playerNameDisplay').innerText = playerName;
+            document.getElementById('loginCard').classList.add('hidden');
+            document.getElementById('quizCard').classList.remove('hidden');
+
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            if (currentIdx >= questionList.length) {
+                finishGame();
+                return;
+            }
+
+            const data = questionList[currentIdx];
+            document.getElementById('qBadge').innerText = `CÂU ${currentIdx + 1} / 8`;
+            document.getElementById('questionText').innerText = data.q;
+            document.getElementById('feedbackBox').className = "hidden";
+
+            const grid = document.getElementById('optionsGrid');
+            grid.innerHTML = '';
+            const labels = ['A', 'B', 'C', 'D'];
+
+            data.options.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full p-3 rounded-2xl bg-slate-950 hover:bg-slate-800 border-2 border-slate-800 text-left text-xs font-bold flex items-start gap-3 transition-all";
+                btn.innerHTML = `
+                    <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-400/30 flex items-center justify-center text-xs font-black flex-shrink-0">
+                        ${labels[i]}
+                    </span>
+                    <span class="pt-0.5 leading-snug">${opt}</span>
+                `;
+                btn.onclick = () => selectAnswer(i);
+                grid.appendChild(btn);
+            });
+
+            startTimer();
+        }
+
+        function startTimer() {
+            clearInterval(timer);
+            timeLeft = 10;
+            document.getElementById('timerSec').innerText = timeLeft;
+            document.getElementById('timeBar').style.width = '100%';
+
+            timer = setInterval(() => {
+                timeLeft--;
+                totalTimeSpent++;
+                document.getElementById('timerSec').innerText = timeLeft;
+                document.getElementById('timeBar').style.width = `${(timeLeft / 10) * 100}%`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    selectAnswer(-1); // Hết giờ
+                }
+            }, 1000);
+        }
+
+        function selectAnswer(chosenIdx) {
+            clearInterval(timer);
+            const data = questionList[currentIdx];
+            const isCorrect = (chosenIdx === data.correct);
+
+            const buttons = document.querySelectorAll('#optionsGrid button');
+            buttons.forEach((b, idx) => {
+                b.disabled = true;
+                if (idx === data.correct) {
+                    b.classList.add('border-emerald-500', 'bg-emerald-950/60', 'text-emerald-200');
+                } else if (idx === chosenIdx) {
+                    b.classList.add('border-rose-500', 'bg-rose-950/60', 'text-rose-200');
+                }
+            });
+
+            const fb = document.getElementById('feedbackBox');
+            fb.classList.remove('hidden');
+
+            if (isCorrect) {
+                // Điểm = Điểm cơ sở (1000) + Điểm tốc độ (thời gian còn lại * 50)
+                const gained = 1000 + (timeLeft * 50);
+                score += gained;
+                correctCount++;
+                fb.className = "p-3 rounded-2xl text-xs font-bold border mb-2 bg-emerald-950/70 border-emerald-500/50 text-emerald-300";
+                fb.innerHTML = `🎉 CHÍNH XÁC! (+${gained} điểm)`;
+                confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+            } else {
+                fb.className = "p-3 rounded-2xl text-xs font-bold border mb-2 bg-rose-950/70 border-rose-500/50 text-rose-300";
+                fb.innerHTML = chosenIdx === -1 ? `⏰ HẾT GIỜ! Đáp án đúng là ${['A','B','C','D'][data.correct]}` : `❌ CHƯA CHÍNH XÁC! Đáp án đúng là ${['A','B','C','D'][data.correct]}`;
+            }
+
+            // Chuyển câu hỏi sau 1.2 giây
+            setTimeout(() => {
+                currentIdx++;
+                loadQuestion();
+            }, 1200);
+        }
+
+        function finishGame() {
+            document.getElementById('quizCard').classList.add('hidden');
+            document.getElementById('resultCard').classList.remove('hidden');
+
+            document.getElementById('finalCorrect').innerText = `${correctCount}/8`;
+            document.getElementById('finalTime').innerText = `${totalTimeSpent}s`;
+            document.getElementById('finalScore').innerText = score;
+
+            // Ghi điểm số lên Firebase Realtime Database
+            const newScoreRef = database.ref('rooms/' + roomCode + '/scores').push();
+            newScoreRef.set({
+                name: playerName,
+                score: score,
+                correctCount: correctCount,
+                totalTime: totalTimeSpent,
+                timestamp: Date.now()
+            });
+
+            confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+        }
+    </script>
+</body>
+</html>

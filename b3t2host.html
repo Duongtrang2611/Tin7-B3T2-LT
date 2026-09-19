@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bảng Xếp Hạng - Tin Học: Quản Lý Tệp & Thư Mục</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800;900&family=Bungee&display=swap" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .bungee-font { font-family: 'Bungee', cursive; }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen p-4 md:p-8 flex flex-col items-center">
+
+    <!-- Header Host -->
+    <header class="w-full max-w-5xl bg-slate-900 border-2 border-amber-500/40 px-6 py-4 rounded-3xl flex flex-wrap justify-between items-center shadow-2xl gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-2xl font-black shadow-lg">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div>
+                <h1 class="text-base md:text-xl font-black text-amber-300 bungee-font tracking-wide">
+                    ĐẤU TRƯỜNG TIN HỌC: QUẢN LÝ TỆP & THƯ MỤC
+                </h1>
+                <p class="text-xs text-slate-400">Chế độ thi trực tiếp • 8 câu hỏi (10 giây/câu)</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="bg-slate-950 px-5 py-2.5 rounded-2xl border border-amber-400/50 flex flex-col items-center">
+                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">MÃ PHÒNG THI</span>
+                <span id="roomCodeDisplay" class="font-black text-amber-400 text-2xl bungee-font tracking-widest">8888</span>
+            </div>
+            <button onclick="resetLeaderboard()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold transition-all">
+                <i class="fa-solid fa-rotate-right mr-1"></i> Làm mới
+            </button>
+        </div>
+    </header>
+
+    <!-- Khu vực Bảng Xếp Hạng Trực Tiếp -->
+    <main class="w-full max-w-5xl mt-6 flex-1 flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-base md:text-lg font-black text-slate-200 flex items-center gap-2">
+                <i class="fa-solid fa-ranking-star text-amber-400"></i> BẢNG TỔNG SẮP ĐIỂM SỐ
+            </h2>
+            <span id="playerCount" class="text-xs font-bold text-slate-400 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                Đang có: 0 học sinh hoàn thành
+            </span>
+        </div>
+
+        <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 md:p-6 shadow-xl flex-1 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-800 text-slate-400 text-xs font-black uppercase">
+                            <th class="py-3 px-4 text-center">Hạng</th>
+                            <th class="py-3 px-4">Họ và tên học sinh</th>
+                            <th class="py-3 px-4 text-center">Số câu đúng</th>
+                            <th class="py-3 px-4 text-center">Thời gian hoàn thành</th>
+                            <th class="py-3 px-4 text-right">Tổng điểm</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rankingBody" class="divide-y divide-slate-800/60 text-xs md:text-sm font-semibold">
+                        <!-- Danh sách học sinh nộp bài sẽ tự động chèn vào đây -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="emptyNotice" class="py-16 text-center text-slate-500 text-xs">
+                <i class="fa-solid fa-spinner animate-spin text-2xl mb-3 text-amber-500"></i>
+                <p>Đang đợi học sinh hoàn thành bài thi...</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Cấu hình Firebase Realtime Database
+        const firebaseConfig = {
+            databaseURL: "https://tinhoc-luyentap-default-rtdb.firebaseio.com"
+        };
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const database = firebase.database();
+        const ROOM_CODE = "8888"; // Mã phòng mặc định
+
+        document.getElementById('roomCodeDisplay').innerText = ROOM_CODE;
+
+        const scoresRef = database.ref('rooms/' + ROOM_CODE + '/scores');
+
+        // Lắng nghe cập nhật điểm trực tiếp từ học sinh
+        scoresRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            renderLeaderboard(data);
+        });
+
+        function renderLeaderboard(data) {
+            const tbody = document.getElementById('rankingBody');
+            const emptyNotice = document.getElementById('emptyNotice');
+            tbody.innerHTML = '';
+
+            if (!data) {
+                emptyNotice.classList.remove('hidden');
+                document.getElementById('playerCount').innerText = "Đang có: 0 học sinh hoàn thành";
+                return;
+            }
+
+            emptyNotice.classList.add('hidden');
+            const players = Object.values(data);
+
+            // Sắp xếp: Điểm cao xếp trước, nếu bằng điểm thì ai tốn ít thời gian hơn xếp trước
+            players.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return a.totalTime - b.totalTime;
+            });
+
+            document.getElementById('playerCount').innerText = `Đang có: ${players.length} học sinh hoàn thành`;
+
+            players.forEach((p, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 transition-colors";
+
+                let rankBadge = `<span class="font-mono text-slate-400 font-bold">${idx + 1}</span>`;
+                if (idx === 0) rankBadge = `<span class="w-7 h-7 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center mx-auto text-xs">🥇 1</span>`;
+                if (idx === 1) rankBadge = `<span class="w-7 h-7 rounded-xl bg-slate-300 text-slate-950 font-black flex items-center justify-center mx-auto text-xs">🥈 2</span>`;
+                if (idx === 2) rankBadge = `<span class="w-7 h-7 rounded-xl bg-amber-700 text-white font-black flex items-center justify-center mx-auto text-xs">🥉 3</span>`;
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-center">${rankBadge}</td>
+                    <td class="py-3 px-4 font-bold text-white">${p.name}</td>
+                    <td class="py-3 px-4 text-center text-emerald-400 font-mono font-bold">${p.correctCount}/8</td>
+                    <td class="py-3 px-4 text-center text-slate-400 font-mono">${p.totalTime}s</td>
+                    <td class="py-3 px-4 text-right font-black text-amber-400 font-mono text-base">${p.score}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Bắn pháo hoa ăn mừng khi có top 1 mới
+            if (players.length > 0) {
+                confetti({ particleCount: 30, spread: 50, origin: { y: 0.3 } });
+            }
+        }
+
+        function resetLeaderboard() {
+            if (confirm("Thầy/Cô có chắc chắn muốn xóa toàn bộ điểm của phòng này để bắt đầu lượt mới?")) {
+                scoresRef.remove();
+            }
+        }
+    </script>
+</body>
+</html>
